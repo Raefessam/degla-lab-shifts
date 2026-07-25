@@ -79,12 +79,12 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
   <div class="card">
     <div class="stitle">تسجيل الدخول</div>
     <div class="fg">
-      <label>الفرع</label>
+      <label>الفرع اللي هتشتغل فيه النهاردة</label>
       <select id="branchSelect"><option value="">اختر الفرع...</option></select>
     </div>
     <div class="fg">
       <label>الاسم</label>
-      <select id="nameSelect" disabled><option value="">اختر الفرع أولاً</option></select>
+      <select id="nameSelect"><option value="">اختر...</option></select>
     </div>
     <div class="fg">
       <label>الكود</label>
@@ -105,6 +105,7 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
     </div>
     <div id="shiftBadge"><span class="badge bwarn">مفيش شيفت مفتوح</span></div>
   </div>
+  <button class="btn bno" style="margin-bottom:12px" onclick="signOutEmployee()">تسجيل الخروج</button>
 
   <div id="noShiftCard" class="card">
     <div class="stitle">ابدأ شغلك</div>
@@ -287,30 +288,36 @@ const QUICK_TESTS = ["CBC","Pregnancy","FBG","PPB","Urine","Urine ck"];
 let currentTests = [];
 let myProfile = null;
 let myShift = null;
+let myWorkingBranchId = null;
+let myWorkingBranchName = null;
 let selectedDebtVisit = null;
 
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
-  if (session) { await afterLogin(); return; }
+  if (session) {
+    const savedBranchId = sessionStorage.getItem('degla_working_branch_id');
+    const savedBranchName = sessionStorage.getItem('degla_working_branch_name');
+    if (!savedBranchId) { await sb.auth.signOut(); await loadBranches(); await loadAllNames(); return; }
+    myWorkingBranchId = savedBranchId;
+    myWorkingBranchName = savedBranchName;
+    await afterLogin();
+    return;
+  }
   await loadBranches();
+  await loadAllNames();
 }
 
 async function loadBranches() {
-  const { data, error } = await sb.from('branches').select('id,name').eq('is_active', true).order('name');
+  const { data } = await sb.from('branches').select('id,name').eq('is_active', true).order('name');
   const sel = document.getElementById('branchSelect');
   if (data) data.forEach(b => {
     const o = document.createElement('option'); o.value = b.id; o.textContent = b.name; sel.appendChild(o);
   });
-  sel.onchange = loadNamesForBranch;
 }
 
-async function loadNamesForBranch() {
-  const branchId = document.getElementById('branchSelect').value;
+async function loadAllNames() {
   const nameSel = document.getElementById('nameSelect');
-  nameSel.innerHTML = '<option value="">اختر...</option>';
-  nameSel.disabled = !branchId;
-  if (!branchId) return;
-  const { data, error } = await sb.rpc('list_branch_employees', { p_branch_id: branchId });
+  const { data } = await sb.rpc('list_all_employees');
   if (data) data.forEach(r => {
     const o = document.createElement('option'); o.value = r.name; o.textContent = r.name; nameSel.appendChild(o);
   });
@@ -318,17 +325,22 @@ async function loadNamesForBranch() {
 
 async function doLogin() {
   const branchId = document.getElementById('branchSelect').value;
+  const branchName = document.getElementById('branchSelect').selectedOptions[0]?.textContent || '';
   const name = document.getElementById('nameSelect').value;
   const pin = document.getElementById('pinInput').value;
   const msg = document.getElementById('loginMsg');
   msg.className = 'msg'; msg.textContent = '';
   if (!branchId || !name || !pin) { msg.className = 'msg err'; msg.textContent = 'كمّل البيانات كلها'; return; }
 
-  const { data: email, error: e1 } = await sb.rpc('get_login_email', { p_name: name, p_branch_id: branchId });
+  const { data: email, error: e1 } = await sb.rpc('get_login_email_by_name', { p_name: name });
   if (e1 || !email) { msg.className = 'msg err'; msg.textContent = 'مش لاقي الحساب ده'; return; }
 
   const { error: e2 } = await sb.auth.signInWithPassword({ email, password: pin });
   if (e2) { msg.className = 'msg err'; msg.textContent = 'الكود غلط'; return; }
+  myWorkingBranchId = branchId;
+  myWorkingBranchName = branchName;
+  sessionStorage.setItem('degla_working_branch_id', branchId);
+  sessionStorage.setItem('degla_working_branch_name', branchName);
   await afterLogin();
 }
 
@@ -345,7 +357,7 @@ async function afterLogin() {
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('appView').classList.remove('hidden');
   document.getElementById('empNameDisplay').textContent = profile.name;
-  document.getElementById('branchNameDisplay').textContent = profile.branches?.name || '';
+  document.getElementById('branchNameDisplay').textContent = myWorkingBranchName || '';
   buildQuickTests();
   await checkOpenShift();
 }
@@ -408,11 +420,11 @@ async function checkOpenShift() {
 async function openShift() {
   const msg = document.getElementById('openShiftMsg');
   msg.className = 'msg';
-  if (!myProfile.branch_id) {
-    msg.className = 'msg err'; msg.textContent = 'الحساب ده مش مربوط بفرع - كلّم صاحب العمل';
+  if (!myWorkingBranchId) {
+    msg.className = 'msg err'; msg.textContent = 'مفيش فرع محدد - سجل خروج ودخول تاني';
     return;
   }
-  const { data, error } = await sb.from('shifts').insert({ employee_id: myProfile.id, branch_id: myProfile.branch_id }).select().single();
+  const { data, error } = await sb.from('shifts').insert({ employee_id: myProfile.id, branch_id: myWorkingBranchId }).select().single();
   if (error) { msg.className = 'msg err'; msg.textContent = 'خطأ: ' + error.message; return; }
   myShift = data; await checkOpenShift();
 }
@@ -475,7 +487,7 @@ async function saveVisit() {
   const notes = document.getElementById('visitNotes').value;
 
   const { data: visit, error: vErr } = await sb.from('visits').insert({
-    patient_id: patient.id, shift_id: myShift.id, branch_id: myProfile.branch_id,
+    patient_id: patient.id, shift_id: myShift.id, branch_id: myWorkingBranchId,
     total_price: total, paid_amount: paid, remaining_amount: remaining,
     payment_method: method, notes,
     transfer_confirmed: method !== 'cash' ? document.getElementById('visitTransferConfirmed').checked : false
@@ -499,7 +511,7 @@ async function saveVisit() {
 
 async function loadDebtors() {
   const { data } = await sb.from('visits').select('id, total_price, paid_amount, remaining_amount, patients(name)')
-    .eq('branch_id', myProfile.branch_id).gt('remaining_amount', 0).order('created_at',{ascending:false});
+    .eq('branch_id', myWorkingBranchId).gt('remaining_amount', 0).order('created_at',{ascending:false});
   const wrap = document.getElementById('debtorsList');
   wrap.innerHTML = '';
   if (!data || !data.length) { wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش متأخرين حاليًا</div>'; return; }
@@ -554,7 +566,7 @@ async function saveExpense() {
   const desc = document.getElementById('expenseDesc').value.trim();
   const amount = Number(document.getElementById('expenseAmount').value) || 0;
   if (!desc || amount <= 0) { msg.className='msg err'; msg.textContent='كمّل الوصف والمبلغ'; return; }
-  const { error } = await sb.from('expenses').insert({ shift_id: myShift.id, branch_id: myProfile.branch_id, description: desc, amount });
+  const { error } = await sb.from('expenses').insert({ shift_id: myShift.id, branch_id: myWorkingBranchId, description: desc, amount });
   if (error) { msg.className='msg err'; msg.textContent='خطأ: '+error.message; return; }
   msg.className='msg ok'; msg.textContent='اتحفظ المصروف';
   document.getElementById('expenseDesc').value=''; document.getElementById('expenseAmount').value='';
@@ -649,6 +661,13 @@ async function loadShiftLog() {
     row.innerHTML = `<div><span class="badge ${it.color}">${it.type}</span><div style="margin-top:4px">${it.text}</div></div><span style="color:var(--m);font-size:.72rem">${t}</span>`;
     wrap.appendChild(row);
   });
+}
+
+async function signOutEmployee() {
+  sessionStorage.removeItem('degla_working_branch_id');
+  sessionStorage.removeItem('degla_working_branch_name');
+  await sb.auth.signOut();
+  location.reload();
 }
 
 init();
