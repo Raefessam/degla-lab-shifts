@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" href="icon-180.png"/>
 <link rel="apple-touch-icon" sizes="152x152" href="icon-152.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
@@ -352,13 +353,28 @@ async function openShiftDetail(shift) {
         <th style="padding:8px;border:1px solid var(--b3)">السعر</th>
         <th style="padding:8px;border:1px solid var(--b3)">المدفوع</th>
         <th style="padding:8px;border:1px solid var(--b3)">المتبقي</th>
+        <th style="padding:8px;border:1px solid var(--b3)">طريقة الدفع</th>
         <th style="padding:8px;border:1px solid var(--b3)">ملاحظات</th>
       </tr></thead><tbody>`;
 
+    const methodColors = {
+      cash: 'background:var(--gl);color:var(--gd)',
+      transfer: 'background:var(--info-l);color:var(--info)',
+      wallet: 'background:var(--purple-l);color:var(--purple)',
+      instapay: 'background:var(--warn-l);color:var(--warn-d)'
+    };
+    let sumPrice = 0, sumPaid = 0, sumRemaining = 0;
+
     Object.values(byVisit).forEach(block => {
       const v = block.visit;
+      sumPaid += Number(v.paid_amount||0);
+      sumRemaining += Number(v.remaining_amount||0);
       const dateStr = new Date(v.created_at).toLocaleString('ar-EG', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      const methodPill = v.payment_method !== 'cash'
+        ? `<span style="${methodColors[v.payment_method]||''};padding:3px 10px;border-radius:20px;font-size:.7rem">${methodLabelOwner[v.payment_method]||''}</span> ${v.transfer_confirmed ? '<i class="ti ti-check" style="color:var(--gd)"></i>' : '<i class="ti ti-alert-triangle" style="color:var(--r)"></i>'}`
+        : `<span style="${methodColors.cash};padding:3px 10px;border-radius:20px;font-size:.7rem">كاش</span>`;
       block.tests.forEach((t, i) => {
+        sumPrice += Number(t.price||0);
         const isFirst = i === 0;
         const rowspan = block.tests.length;
         html += '<tr>';
@@ -370,11 +386,21 @@ async function openShiftDetail(shift) {
           html += `<td style="padding:8px;border:1px solid var(--b3)" rowspan="${rowspan}">${v.paid_amount}</td>`;
           const remColor = v.remaining_amount > 0 ? 'color:var(--warn-d);font-weight:700' : '';
           html += `<td style="padding:8px;border:1px solid var(--b3);${remColor}" rowspan="${rowspan}">${v.remaining_amount}</td>`;
+          html += `<td style="padding:8px;border:1px solid var(--b3)" rowspan="${rowspan}">${methodPill}</td>`;
           html += `<td style="padding:8px;border:1px solid var(--b3)" rowspan="${rowspan}">${v.notes || ''}</td>`;
         }
         html += '</tr>';
       });
     });
+
+    html += `<tr style="background:var(--gl);font-weight:900">
+      <td colspan="3" style="padding:8px;border:1px solid var(--b3)">الإجمالي</td>
+      <td style="padding:8px;border:1px solid var(--b3)">${sumPrice}</td>
+      <td style="padding:8px;border:1px solid var(--b3)">${sumPaid}</td>
+      <td style="padding:8px;border:1px solid var(--b3)">${sumRemaining}</td>
+      <td style="padding:8px;border:1px solid var(--b3)"></td>
+      <td style="padding:8px;border:1px solid var(--b3)"></td>
+    </tr>`;
 
     html += '</tbody></table></div>';
   }
