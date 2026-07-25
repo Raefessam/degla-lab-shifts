@@ -136,7 +136,7 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:900px
 </div>
 
 <div class="pmodal" id="shiftDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:white;border-radius:20px;padding:22px;max-width:90vw;width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 15px 50px rgba(0,0,0,.3);">
+  <div style="background:white;border-radius:20px;padding:22px;max-width:94vw;width:640px;max-height:85vh;overflow-y:auto;box-shadow:0 15px 50px rgba(0,0,0,.3);">
     <div id="shiftDetailContent"></div>
     <button class="btn bno" style="margin-top:14px" onclick="document.getElementById('shiftDetailModal').style.display='none'">إغلاق</button>
   </div>
@@ -312,20 +312,11 @@ async function openShiftDetail(shift) {
   content.innerHTML = '<div style="color:var(--m);font-size:.8rem">جاري التحميل...</div>';
   modal.style.display = 'flex';
 
-  const [{ data: visits }, { data: collections }, { data: expenses }] = await Promise.all([
-    sb.from('visits').select('created_at,total_price,paid_amount,payment_method,transfer_confirmed,patients(name)').eq('shift_id', shift.id),
+  const [{ data: testRows }, { data: collections }, { data: expenses }] = await Promise.all([
+    sb.from('visit_tests').select('test_name,price,visits!inner(id,created_at,paid_amount,remaining_amount,notes,shift_id,patients(name))').eq('visits.shift_id', shift.id),
     sb.from('collections').select('created_at,amount,payment_method,transfer_confirmed,visits(patients(name))').eq('shift_id', shift.id),
     sb.from('expenses').select('created_at,description,amount').eq('shift_id', shift.id)
   ]);
-
-  const items = [];
-  (visits||[]).forEach(v => items.push({ time:v.created_at, type:'حالة جديدة', color:'bg',
-    text:`${v.patients?.name||''} - إجمالي ${v.total_price} - مدفوع ${v.paid_amount} (${methodLabelOwner[v.payment_method]||''})` }));
-  (collections||[]).forEach(c => items.push({ time:c.created_at, type:'تحصيل', color:'bwarn',
-    text:`${c.visits?.patients?.name||''} - ${c.amount} جنيه (${methodLabelOwner[c.payment_method]||''})` }));
-  (expenses||[]).forEach(e => items.push({ time:e.created_at, type:'مصروف', color:'bwarn',
-    text:`${e.description} - ${e.amount} جنيه` }));
-  items.sort((a,b) => new Date(a.time) - new Date(b.time));
 
   const openT = new Date(shift.opened_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
   const closeT = shift.closed_at ? new Date(shift.closed_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : 'لسه مفتوح';
@@ -341,15 +332,65 @@ async function openShiftDetail(shift) {
     </div>`;
   }
 
-  html += '<div class="stitle" style="font-size:.82rem">تفاصيل الحركات</div>';
-  if (!items.length) {
-    html += '<div style="color:var(--m);font-size:.8rem">مفيش حركات في الشيفت ده</div>';
+  html += '<div class="stitle" style="font-size:.82rem">اليومية</div>';
+  if (!testRows || !testRows.length) {
+    html += '<div style="color:var(--m);font-size:.8rem;margin-bottom:14px">مفيش حالات في الشيفت ده</div>';
   } else {
-    items.forEach(it => {
-      const t = new Date(it.time).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
-      html += `<div class="list-item"><div><span class="badge ${it.color}">${it.type}</span><div style="margin-top:4px">${it.text}</div></div><span style="color:var(--m);font-size:.72rem">${t}</span></div>`;
+    // group test rows by visit so paid/remaining/notes show once per patient block
+    const byVisit = {};
+    testRows.forEach(r => {
+      const vid = r.visits.id;
+      if (!byVisit[vid]) byVisit[vid] = { visit: r.visits, tests: [] };
+      byVisit[vid].tests.push(r);
+    });
+
+    html += `<div style="overflow-x:auto;margin-bottom:16px"><table style="width:100%;border-collapse:collapse;font-size:.76rem">
+      <thead><tr style="background:var(--gp);text-align:right">
+        <th style="padding:8px;border:1px solid var(--b3)">الاسم</th>
+        <th style="padding:8px;border:1px solid var(--b3)">نوع التحليل</th>
+        <th style="padding:8px;border:1px solid var(--b3)">التاريخ</th>
+        <th style="padding:8px;border:1px solid var(--b3)">السعر</th>
+        <th style="padding:8px;border:1px solid var(--b3)">المدفوع</th>
+        <th style="padding:8px;border:1px solid var(--b3)">المتبقي</th>
+        <th style="padding:8px;border:1px solid var(--b3)">ملاحظات</th>
+      </tr></thead><tbody>`;
+
+    Object.values(byVisit).forEach(block => {
+      const v = block.visit;
+      const dateStr = new Date(v.created_at).toLocaleString('ar-EG', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+      block.tests.forEach((t, i) => {
+        const isFirst = i === 0;
+        const rowspan = block.tests.length;
+        html += '<tr>';
+        if (isFirst) html += `<td style="padding:8px;border:1px solid var(--b3);font-weight:700" rowspan="${rowspan}">${v.patients?.name||''}</td>`;
+        html += `<td style="padding:8px;border:1px solid var(--b3)">${t.test_name}</td>`;
+        if (isFirst) html += `<td style="padding:8px;border:1px solid var(--b3)" rowspan="${rowspan}">${dateStr}</td>`;
+        html += `<td style="padding:8px;border:1px solid var(--b3)">${t.price}</td>`;
+        if (isFirst) {
+          html += `<td style="padding:8px;border:1px solid var(--b3)" rowspan="${rowspan}">${v.paid_amount}</td>`;
+          const remColor = v.remaining_amount > 0 ? 'color:var(--warn-d);font-weight:700' : '';
+          html += `<td style="padding:8px;border:1px solid var(--b3);${remColor}" rowspan="${rowspan}">${v.remaining_amount}</td>`;
+          html += `<td style="padding:8px;border:1px solid var(--b3)" rowspan="${rowspan}">${v.notes || ''}</td>`;
+        }
+        html += '</tr>';
+      });
+    });
+
+    html += '</tbody></table></div>';
+  }
+
+  if ((collections && collections.length) || (expenses && expenses.length)) {
+    html += '<div class="stitle" style="font-size:.82rem">تحصيل ومصاريف</div>';
+    (collections||[]).forEach(c => {
+      const t = new Date(c.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+      html += `<div class="list-item"><div><span class="badge bwarn">تحصيل</span><div style="margin-top:4px">${c.visits?.patients?.name||''} - ${c.amount} جنيه (${methodLabelOwner[c.payment_method]||''})</div></div><span style="color:var(--m);font-size:.72rem">${t}</span></div>`;
+    });
+    (expenses||[]).forEach(e => {
+      const t = new Date(e.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+      html += `<div class="list-item"><div><span class="badge bwarn">مصروف</span><div style="margin-top:4px">${e.description} - ${e.amount} جنيه</div></div><span style="color:var(--m);font-size:.72rem">${t}</span></div>`;
     });
   }
+
   content.innerHTML = html;
 }
 
