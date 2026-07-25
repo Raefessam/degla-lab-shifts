@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
 <title>Degla Lab - لوحة صاحب العمل</title>
 <meta name="theme-color" content="#4e9012"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="Degla Lab مالك"/>
+<meta name="application-name" content="Degla Lab مالك"/>
+<link rel="manifest" href="manifest-owner.json"/>
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+<link rel="apple-touch-icon" href="icon-180.png"/>
+<link rel="apple-touch-icon" sizes="152x152" href="icon-152.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -109,6 +119,11 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:900px
   </div>
 
   <div class="card">
+    <div class="stitle">الشيفتات خلال اليوم</div>
+    <div id="shiftsList"></div>
+  </div>
+
+  <div class="card">
     <div class="stitle">إضافة موظف جديد</div>
     <div class="fg"><label>الاسم</label><input type="text" id="newEmpName"/></div>
     <div class="fg"><label>الفرع</label><select id="newEmpBranch"></select></div>
@@ -118,6 +133,13 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:900px
   </div>
 
   <button class="btn bno" onclick="sb.auth.signOut().then(()=>location.reload())">تسجيل الخروج</button>
+</div>
+
+<div class="pmodal" id="shiftDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:20px;padding:22px;max-width:90vw;width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 15px 50px rgba(0,0,0,.3);">
+    <div id="shiftDetailContent"></div>
+    <button class="btn bno" style="margin-top:14px" onclick="document.getElementById('shiftDetailModal').style.display='none'">إغلاق</button>
+  </div>
 </div>
 
 <script>
@@ -193,6 +215,8 @@ async function loadDashboard() {
   document.getElementById('mWallet').textContent = byMethod.wallet;
   document.getElementById('mInstapay').textContent = byMethod.instapay;
 
+  await loadShifts(start, end);
+
   const bGrid = document.getElementById('branchGrid');
   bGrid.innerHTML = '';
   branches.forEach(b => {
@@ -245,6 +269,88 @@ async function addEmployee() {
   if (!res.ok) { msg.className='msg err'; msg.textContent='خطأ: ' + (result.error||''); return; }
   msg.className='msg ok'; msg.textContent='تم إضافة الموظف: ' + name;
   document.getElementById('newEmpName').value=''; document.getElementById('newEmpPin').value='';
+}
+
+const methodLabelOwner = { cash:'كاش', transfer:'تحويل', wallet:'محفظة', instapay:'إنستاباي' };
+
+async function loadShifts(start, end) {
+  const wrap = document.getElementById('shiftsList');
+  wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">جاري التحميل...</div>';
+
+  const { data: shifts, error } = await sb.from('shifts')
+    .select('id,opened_at,closed_at,status,expected_cash,actual_cash,cash_diff_note,app_users(name),branches(name)')
+    .gte('opened_at', start).lte('opened_at', end)
+    .order('opened_at', { ascending: false });
+
+  wrap.innerHTML = '';
+  if (error) { wrap.innerHTML = '<div style="color:var(--r);font-size:.8rem">خطأ: '+error.message+'</div>'; return; }
+  if (!shifts || !shifts.length) { wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش شيفتات في اليوم ده</div>'; return; }
+
+  shifts.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'list-item';
+    row.style.cursor = 'pointer';
+    const openT = new Date(s.opened_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+    const closeT = s.closed_at ? new Date(s.closed_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const statusBadge = s.status === 'open' ? '<span class="badge bg">مفتوح</span>' : '<span class="badge" style="background:var(--b3);color:var(--m)">مقفول</span>';
+    let diffBadge = '';
+    if (s.status === 'closed' && s.actual_cash !== null && s.expected_cash !== null) {
+      const diff = Number(s.actual_cash) - Number(s.expected_cash);
+      if (Math.abs(diff) > 0.01) diffBadge = `<span class="badge bwarn">فرق ${diff > 0 ? '+' : ''}${diff}</span>`;
+    }
+    row.innerHTML = `<div><div style="font-weight:700">${s.app_users?.name||''} - ${s.branches?.name||''}</div>
+      <div style="font-size:.72rem;color:var(--m)">${openT} → ${closeT}</div></div>
+      <div style="display:flex;gap:6px;align-items:center">${diffBadge}${statusBadge}</div>`;
+    row.onclick = () => openShiftDetail(s);
+    wrap.appendChild(row);
+  });
+}
+
+async function openShiftDetail(shift) {
+  const modal = document.getElementById('shiftDetailModal');
+  const content = document.getElementById('shiftDetailContent');
+  content.innerHTML = '<div style="color:var(--m);font-size:.8rem">جاري التحميل...</div>';
+  modal.style.display = 'flex';
+
+  const [{ data: visits }, { data: collections }, { data: expenses }] = await Promise.all([
+    sb.from('visits').select('created_at,total_price,paid_amount,payment_method,transfer_confirmed,patients(name)').eq('shift_id', shift.id),
+    sb.from('collections').select('created_at,amount,payment_method,transfer_confirmed,visits(patients(name))').eq('shift_id', shift.id),
+    sb.from('expenses').select('created_at,description,amount').eq('shift_id', shift.id)
+  ]);
+
+  const items = [];
+  (visits||[]).forEach(v => items.push({ time:v.created_at, type:'حالة جديدة', color:'bg',
+    text:`${v.patients?.name||''} - إجمالي ${v.total_price} - مدفوع ${v.paid_amount} (${methodLabelOwner[v.payment_method]||''})` }));
+  (collections||[]).forEach(c => items.push({ time:c.created_at, type:'تحصيل', color:'bwarn',
+    text:`${c.visits?.patients?.name||''} - ${c.amount} جنيه (${methodLabelOwner[c.payment_method]||''})` }));
+  (expenses||[]).forEach(e => items.push({ time:e.created_at, type:'مصروف', color:'bwarn',
+    text:`${e.description} - ${e.amount} جنيه` }));
+  items.sort((a,b) => new Date(a.time) - new Date(b.time));
+
+  const openT = new Date(shift.opened_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+  const closeT = shift.closed_at ? new Date(shift.closed_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : 'لسه مفتوح';
+
+  let html = `<div class="stitle">${shift.app_users?.name||''} - ${shift.branches?.name||''}</div>
+    <div style="font-size:.8rem;color:var(--m);margin-bottom:14px">من ${openT} إلى ${closeT}</div>`;
+
+  if (shift.status === 'closed') {
+    html += `<div class="totals" style="background:var(--gl);border-radius:12px;padding:12px;margin-bottom:14px">
+      <div class="totals-line"><span>الكاش المتوقع</span><span>${shift.expected_cash ?? '—'}</span></div>
+      <div class="totals-line"><span>الكاش الفعلي</span><span>${shift.actual_cash ?? '—'}</span></div>
+      ${shift.cash_diff_note ? `<div style="font-size:.75rem;color:var(--warn-d);margin-top:6px">ملاحظة: ${shift.cash_diff_note}</div>` : ''}
+    </div>`;
+  }
+
+  html += '<div class="stitle" style="font-size:.82rem">تفاصيل الحركات</div>';
+  if (!items.length) {
+    html += '<div style="color:var(--m);font-size:.8rem">مفيش حركات في الشيفت ده</div>';
+  } else {
+    items.forEach(it => {
+      const t = new Date(it.time).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+      html += `<div class="list-item"><div><span class="badge ${it.color}">${it.type}</span><div style="margin-top:4px">${it.text}</div></div><span style="color:var(--m);font-size:.72rem">${t}</span></div>`;
+    });
+  }
+  content.innerHTML = html;
 }
 
 init();
