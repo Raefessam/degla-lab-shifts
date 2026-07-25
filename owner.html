@@ -334,6 +334,7 @@ async function openShiftDetail(shift) {
   }
 
   html += '<div class="stitle" style="font-size:.82rem">اليومية</div>';
+  let sumPrice = 0, sumPaid = 0, sumRemaining = 0;
   if (!testRows || !testRows.length) {
     html += '<div style="color:var(--m);font-size:.8rem;margin-bottom:14px">مفيش حالات في الشيفت ده</div>';
   } else {
@@ -363,7 +364,6 @@ async function openShiftDetail(shift) {
       wallet: 'background:var(--purple-l);color:var(--purple)',
       instapay: 'background:var(--warn-l);color:var(--warn-d)'
     };
-    let sumPrice = 0, sumPaid = 0, sumRemaining = 0;
 
     Object.values(byVisit).forEach(block => {
       const v = block.visit;
@@ -416,6 +416,19 @@ async function openShiftDetail(shift) {
       html += `<div class="list-item"><div><span class="badge bwarn">مصروف</span><div style="margin-top:4px">${e.description} - ${e.amount} جنيه</div></div><span style="color:var(--m);font-size:.72rem">${t}</span></div>`;
     });
   }
+
+  const sumCollections = (collections||[]).reduce((s,c)=>s+Number(c.amount||0),0);
+  const sumExpenses = (expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0);
+  const netClosing = sumPaid + sumCollections - sumExpenses;
+
+  html += `<div class="stitle" style="font-size:.82rem;margin-top:16px">ملخص تقفيل الشيفت</div>
+    <div class="totals" style="background:var(--gp);border-radius:12px;padding:12px 14px">
+      <div class="totals-line"><span>مدفوع من الحالات</span><span>${sumPaid}</span></div>
+      <div class="totals-line"><span>+ تحصيل متبقيات قديمة</span><span>${sumCollections}</span></div>
+      <div class="totals-line"><span>- مصاريف</span><span>${sumExpenses}</span></div>
+      <div class="totals-line net"><span>= صافي التقفيل</span><span>${netClosing}</span></div>
+      <div class="totals-line" style="color:var(--m);font-size:.72rem;margin-top:4px"><span>متبقي لسه على المرضى (غير محصّل)</span><span>${sumRemaining}</span></div>
+    </div>`;
 
   content.innerHTML = html;
 }
