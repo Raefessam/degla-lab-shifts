@@ -236,7 +236,9 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
 <script>
 const SUPABASE_URL = "https://gykinznwbyzrmuohzgdg.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5a2luem53Ynl6cm11b2h6Z2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODIzODgsImV4cCI6MjEwMDU1ODM4OH0.QMtKX5LBdH2HPrFIIZ_SUCgBX5KSNjp3WMC9_e4wnq0";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { storageKey: 'degla-lab-employee-auth' }
+});
 
 const QUICK_TESTS = ["CBC","Pregnancy","FBG","PPB","Urine","Urine ck"];
 let currentTests = [];
@@ -290,6 +292,12 @@ async function doLogin() {
 async function afterLogin() {
   const { data: { user } } = await sb.auth.getUser();
   const { data: profile } = await sb.from('app_users').select('*, branches(name)').eq('id', user.id).single();
+  if (!profile || profile.role !== 'employee') {
+    await sb.auth.signOut();
+    document.getElementById('loginMsg').className = 'msg err';
+    document.getElementById('loginMsg').textContent = 'الحساب ده مش حساب موظف';
+    return;
+  }
   myProfile = profile;
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('appView').classList.remove('hidden');
