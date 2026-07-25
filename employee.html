@@ -109,6 +109,7 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
   <div id="noShiftCard" class="card">
     <div class="stitle">ابدأ شغلك</div>
     <button class="btn bng" onclick="openShift()">فتح شيفت</button>
+    <div class="msg" id="openShiftMsg"></div>
   </div>
 
   <div id="shiftArea" class="hidden">
@@ -370,8 +371,15 @@ async function checkOpenShift() {
 }
 
 async function openShift() {
+  const msg = document.getElementById('openShiftMsg');
+  msg.className = 'msg';
+  if (!myProfile.branch_id) {
+    msg.className = 'msg err'; msg.textContent = 'الحساب ده مش مربوط بفرع - كلّم صاحب العمل';
+    return;
+  }
   const { data, error } = await sb.from('shifts').insert({ employee_id: myProfile.id, branch_id: myProfile.branch_id }).select().single();
-  if (!error) { myShift = data; await checkOpenShift(); }
+  if (error) { msg.className = 'msg err'; msg.textContent = 'خطأ: ' + error.message; return; }
+  myShift = data; await checkOpenShift();
 }
 
 function switchTab(tab) {
