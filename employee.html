@@ -118,6 +118,7 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
       <button class="tab-btn act" data-tab="visit" onclick="switchTab('visit')">حالة جديدة</button>
       <button class="tab-btn" data-tab="collect" onclick="switchTab('collect')">تحصيل متبقي</button>
       <button class="tab-btn" data-tab="expense" onclick="switchTab('expense')">مصروف</button>
+      <button class="tab-btn" data-tab="log" onclick="switchTab('log')">سجل الشيفت</button>
     </div>
 
     <!-- VISIT PANEL -->
@@ -140,12 +141,25 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
         </div>
         <div class="fg">
           <label>طريقة الدفع</label>
-          <select id="visitPaymentMethod">
+          <select id="visitPaymentMethod" onchange="toggleTransferConfirm('visit')">
             <option value="cash">كاش</option>
             <option value="transfer">تحويل</option>
             <option value="wallet">محفظة</option>
             <option value="instapay">إنستاباي</option>
           </select>
+        </div>
+        <div class="card" id="visitTransferConfirmCard" style="display:none;background:var(--warn-l);border-color:var(--warn-d);padding:12px 14px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:900;font-size:.85rem">تم التأكد من التحويل</div>
+              <div style="font-size:.72rem;color:var(--warn-d);margin-top:2px" id="visitTransferHint">شفت شاشة التحويل على موبايل المريض</div>
+            </div>
+            <label style="position:relative;width:46px;height:26px;flex-shrink:0;cursor:pointer;">
+              <input type="checkbox" id="visitTransferConfirmed" style="opacity:0;width:0;height:0" onchange="updateTransferVisual('visit')"/>
+              <span id="visitTransferTrack" style="position:absolute;inset:0;background:var(--b3);border-radius:20px;transition:.2s"></span>
+              <span id="visitTransferKnob" style="position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;right:3px;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.2s"></span>
+            </label>
+          </div>
         </div>
         <div class="fg">
           <label>ملاحظات (اختياري)</label>
@@ -170,12 +184,25 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
         </div>
         <div class="fg">
           <label>طريقة الدفع</label>
-          <select id="collectPaymentMethod">
+          <select id="collectPaymentMethod" onchange="toggleTransferConfirm('collect')">
             <option value="cash">كاش</option>
             <option value="transfer">تحويل</option>
             <option value="wallet">محفظة</option>
             <option value="instapay">إنستاباي</option>
           </select>
+        </div>
+        <div class="card" id="collectTransferConfirmCard" style="display:none;background:var(--warn-l);border-color:var(--warn-d);padding:12px 14px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:900;font-size:.85rem">تم التأكد من التحويل</div>
+              <div style="font-size:.72rem;color:var(--warn-d);margin-top:2px">شفت شاشة التحويل على موبايل المريض</div>
+            </div>
+            <label style="position:relative;width:46px;height:26px;flex-shrink:0;cursor:pointer;">
+              <input type="checkbox" id="collectTransferConfirmed" style="opacity:0;width:0;height:0" onchange="updateTransferVisual('collect')"/>
+              <span id="collectTransferTrack" style="position:absolute;inset:0;background:var(--b3);border-radius:20px;transition:.2s"></span>
+              <span id="collectTransferKnob" style="position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;right:3px;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.2s"></span>
+            </label>
+          </div>
         </div>
         <button class="btn bng" onclick="saveCollection()">حفظ التحصيل</button>
         <div class="msg" id="collectMsg"></div>
@@ -195,6 +222,14 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
         </div>
         <button class="btn bng" onclick="saveExpense()">حفظ المصروف</button>
         <div class="msg" id="expenseMsg"></div>
+      </div>
+    </div>
+
+    <!-- LOG PANEL -->
+    <div class="panel" id="panel-log">
+      <div class="card">
+        <div class="stitle">كل الحركات في الشيفت ده بالترتيب</div>
+        <div id="shiftLogList"></div>
       </div>
     </div>
 
@@ -386,6 +421,35 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('act', b.dataset.tab === tab));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
+  if (tab === 'log') loadShiftLog();
+}
+
+function toggleTransferConfirm(kind) {
+  const method = document.getElementById(kind === 'visit' ? 'visitPaymentMethod' : 'collectPaymentMethod').value;
+  const card = document.getElementById(kind + 'TransferConfirmCard');
+  const checkbox = document.getElementById(kind + 'TransferConfirmed');
+  if (method === 'cash') {
+    card.style.display = 'none';
+    checkbox.checked = false;
+  } else {
+    card.style.display = 'block';
+  }
+  updateTransferVisual(kind);
+}
+function updateTransferVisual(kind) {
+  const checked = document.getElementById(kind + 'TransferConfirmed').checked;
+  const card = document.getElementById(kind + 'TransferConfirmCard');
+  const track = document.getElementById(kind + 'TransferTrack');
+  const knob = document.getElementById(kind + 'TransferKnob');
+  if (checked) {
+    card.style.background = 'var(--gl)'; card.style.borderColor = 'var(--g)';
+    track.style.background = 'var(--gd)';
+    knob.style.right = 'auto'; knob.style.left = '3px';
+  } else {
+    card.style.background = 'var(--warn-l)'; card.style.borderColor = 'var(--warn-d)';
+    track.style.background = 'var(--b3)';
+    knob.style.left = 'auto'; knob.style.right = '3px';
+  }
 }
 
 async function saveVisit() {
@@ -401,16 +465,20 @@ async function saveVisit() {
     patient = newP;
   }
 
+  const method = document.getElementById('visitPaymentMethod').value;
+  if (method !== 'cash' && !document.getElementById('visitTransferConfirmed').checked) {
+    msg.className = 'msg err'; msg.textContent = 'لازم تأكد من التحويل الأول'; return;
+  }
   const total = currentTests.reduce((s,t)=>s+(Number(t.price)||0),0);
   const paid = Number(document.getElementById('paidAmount').value) || 0;
   const remaining = Math.max(total - paid, 0);
-  const method = document.getElementById('visitPaymentMethod').value;
   const notes = document.getElementById('visitNotes').value;
 
   const { data: visit, error: vErr } = await sb.from('visits').insert({
     patient_id: patient.id, shift_id: myShift.id, branch_id: myProfile.branch_id,
     total_price: total, paid_amount: paid, remaining_amount: remaining,
-    payment_method: method, notes
+    payment_method: method, notes,
+    transfer_confirmed: method !== 'cash' ? document.getElementById('visitTransferConfirmed').checked : false
   }).select().single();
   if (vErr) { msg.className='msg err'; msg.textContent='خطأ: ' + vErr.message; return; }
 
@@ -422,6 +490,9 @@ async function saveVisit() {
   document.getElementById('patientName').value = '';
   document.getElementById('paidAmount').value = 0;
   document.getElementById('visitNotes').value = '';
+  document.getElementById('visitPaymentMethod').value = 'cash';
+  document.getElementById('visitTransferConfirmed').checked = false;
+  toggleTransferConfirm('visit');
   await refreshShiftSummary();
   await loadDebtors();
 }
@@ -453,9 +524,13 @@ async function saveCollection() {
   const amount = Number(document.getElementById('collectAmount').value) || 0;
   const method = document.getElementById('collectPaymentMethod').value;
   if (amount <= 0) { msg.className='msg err'; msg.textContent='حط مبلغ صحيح'; return; }
+  if (method !== 'cash' && !document.getElementById('collectTransferConfirmed').checked) {
+    msg.className = 'msg err'; msg.textContent = 'لازم تأكد من التحويل الأول'; return;
+  }
 
   const { error: cErr } = await sb.from('collections').insert({
-    visit_id: selectedDebtVisit.id, shift_id: myShift.id, amount, payment_method: method
+    visit_id: selectedDebtVisit.id, shift_id: myShift.id, amount, payment_method: method,
+    transfer_confirmed: method !== 'cash' ? document.getElementById('collectTransferConfirmed').checked : false
   });
   if (cErr) { msg.className='msg err'; msg.textContent='خطأ: '+cErr.message; return; }
 
@@ -465,6 +540,9 @@ async function saveCollection() {
 
   msg.className = 'msg ok'; msg.textContent = 'اتحفظ التحصيل';
   document.getElementById('collectFormCard').classList.add('hidden');
+  document.getElementById('collectPaymentMethod').value = 'cash';
+  document.getElementById('collectTransferConfirmed').checked = false;
+  toggleTransferConfirm('collect');
   selectedDebtVisit = null;
   await loadDebtors();
   await refreshShiftSummary();
@@ -531,6 +609,46 @@ async function confirmCloseShift() {
   if (error) { msg.className='msg err'; msg.textContent='خطأ: '+error.message; return; }
   closeCloseModal();
   await checkOpenShift();
+}
+
+async function loadShiftLog() {
+  const wrap = document.getElementById('shiftLogList');
+  wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">جاري التحميل...</div>';
+
+  const [{ data: visits }, { data: collections }, { data: expenses }] = await Promise.all([
+    sb.from('visits').select('created_at,total_price,paid_amount,payment_method,patients(name)').eq('shift_id', myShift.id),
+    sb.from('collections').select('created_at,amount,payment_method,visits(patients(name))').eq('shift_id', myShift.id),
+    sb.from('expenses').select('created_at,description,amount').eq('shift_id', myShift.id)
+  ]);
+
+  const methodLabel = { cash:'كاش', transfer:'تحويل', wallet:'محفظة', instapay:'إنستاباي' };
+  const items = [];
+  (visits||[]).forEach(v => items.push({
+    time: v.created_at, type: 'حالة جديدة',
+    text: `${v.patients?.name||''} - إجمالي ${v.total_price} - مدفوع ${v.paid_amount} (${methodLabel[v.payment_method]||''})`,
+    color: 'bg'
+  }));
+  (collections||[]).forEach(c => items.push({
+    time: c.created_at, type: 'تحصيل متبقي',
+    text: `${c.visits?.patients?.name||''} - ${c.amount} جنيه (${methodLabel[c.payment_method]||''})`,
+    color: 'bwarn'
+  }));
+  (expenses||[]).forEach(e => items.push({
+    time: e.created_at, type: 'مصروف',
+    text: `${e.description} - ${e.amount} جنيه`,
+    color: 'bwarn'
+  }));
+
+  items.sort((a,b) => new Date(b.time) - new Date(a.time));
+
+  wrap.innerHTML = '';
+  if (!items.length) { wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش حركات لسه في الشيفت ده</div>'; return; }
+  items.forEach(it => {
+    const row = document.createElement('div'); row.className = 'list-item';
+    const t = new Date(it.time).toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
+    row.innerHTML = `<div><span class="badge ${it.color}">${it.type}</span><div style="margin-top:4px">${it.text}</div></div><span style="color:var(--m);font-size:.72rem">${t}</span>`;
+    wrap.appendChild(row);
+  });
 }
 
 init();
