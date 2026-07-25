@@ -203,6 +203,13 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px
       <div class="totals-line"><span>إجمالي محصّل (حالات + تحصيل)</span><span id="sumCollected">0</span></div>
       <div class="totals-line"><span>المصاريف</span><span id="sumExpenses">0</span></div>
       <div class="totals-line net"><span>صافي الشيفت</span><span id="sumNet">0</span></div>
+      <div style="border-top:1.5px solid var(--b3); margin-top:10px; padding-top:10px;">
+        <div class="fg-hint" style="font-size:.7rem; color:var(--m); margin-bottom:8px; font-weight:700;">التفصيل حسب طريقة الدفع</div>
+        <div class="totals-line"><span>كاش</span><span id="sumByCash">0</span></div>
+        <div class="totals-line"><span>تحويل</span><span id="sumByTransfer">0</span></div>
+        <div class="totals-line"><span>محفظة</span><span id="sumByWallet">0</span></div>
+        <div class="totals-line"><span>إنستاباي</span><span id="sumByInstapay">0</span></div>
+      </div>
     </div>
 
     <button class="btn br" onclick="openCloseModal()">قفل الشيفت</button>
@@ -473,10 +480,11 @@ async function refreshShiftSummary() {
   const { data: collections } = await sb.from('collections').select('amount, payment_method').eq('shift_id', myShift.id);
   const { data: expenses } = await sb.from('expenses').select('amount').eq('shift_id', myShift.id);
 
-  const visitCash = (visits||[]).filter(v=>v.payment_method==='cash').reduce((s,v)=>s+Number(v.paid_amount||0),0);
-  const collectCash = (collections||[]).filter(c=>c.payment_method==='cash').reduce((s,c)=>s+Number(c.amount||0),0);
-  const expenseCash = (expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0);
+  const byMethod = { cash: 0, transfer: 0, wallet: 0, instapay: 0 };
+  (visits||[]).forEach(v => { byMethod[v.payment_method] = (byMethod[v.payment_method]||0) + Number(v.paid_amount||0); });
+  (collections||[]).forEach(c => { byMethod[c.payment_method] = (byMethod[c.payment_method]||0) + Number(c.amount||0); });
 
+  const expenseCash = (expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0);
   const totalCollected = (visits||[]).reduce((s,v)=>s+Number(v.paid_amount||0),0) + (collections||[]).reduce((s,c)=>s+Number(c.amount||0),0);
   const totalExpenses = expenseCash;
 
@@ -485,7 +493,12 @@ async function refreshShiftSummary() {
   document.getElementById('sumExpenses').textContent = totalExpenses;
   document.getElementById('sumNet').textContent = totalCollected - totalExpenses;
 
-  window._expectedCash = visitCash + collectCash - expenseCash;
+  document.getElementById('sumByCash').textContent = byMethod.cash;
+  document.getElementById('sumByTransfer').textContent = byMethod.transfer;
+  document.getElementById('sumByWallet').textContent = byMethod.wallet;
+  document.getElementById('sumByInstapay').textContent = byMethod.instapay;
+
+  window._expectedCash = byMethod.cash - expenseCash;
 }
 
 function openCloseModal() {

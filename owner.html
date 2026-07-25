@@ -84,6 +84,16 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:900px
     <div class="metric"><div class="lbl">عدد الحالات</div><div class="val" id="mCount">0</div></div>
   </div>
 
+  <div class="card">
+    <div class="stitle">التفصيل حسب طريقة الدفع</div>
+    <div class="grid4" style="margin-bottom:0">
+      <div class="metric"><div class="lbl">كاش</div><div class="val" id="mCash">0</div></div>
+      <div class="metric"><div class="lbl">تحويل</div><div class="val" id="mTransfer">0</div></div>
+      <div class="metric"><div class="lbl">محفظة</div><div class="val" id="mWallet">0</div></div>
+      <div class="metric"><div class="lbl">إنستاباي</div><div class="val" id="mInstapay">0</div></div>
+    </div>
+  </div>
+
   <div class="stitle">مقارنة الفروع</div>
   <div class="grid3" id="branchGrid"></div>
 
@@ -173,6 +183,15 @@ async function loadDashboard() {
   document.getElementById('mCollected').textContent = totalCollected;
   document.getElementById('mRemaining').textContent = totalRemaining;
   document.getElementById('mCount').textContent = (visits||[]).length;
+
+  const byMethod = { cash: 0, transfer: 0, wallet: 0, instapay: 0 };
+  (visits||[]).forEach(v => { byMethod[v.payment_method] = (byMethod[v.payment_method]||0) + Number(v.paid_amount||0); });
+  const { data: collectionsWithMethod } = await sb.from('collections').select('amount,payment_method').gte('created_at', start).lte('created_at', end);
+  (collectionsWithMethod||[]).forEach(c => { byMethod[c.payment_method] = (byMethod[c.payment_method]||0) + Number(c.amount||0); });
+  document.getElementById('mCash').textContent = byMethod.cash;
+  document.getElementById('mTransfer').textContent = byMethod.transfer;
+  document.getElementById('mWallet').textContent = byMethod.wallet;
+  document.getElementById('mInstapay').textContent = byMethod.instapay;
 
   const bGrid = document.getElementById('branchGrid');
   bGrid.innerHTML = '';
