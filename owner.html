@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
+<title>Degla Lab - لوحة صاحب العمل</title>
+<meta name="theme-color" content="#4e9012"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+    --g:#6abf1e; --gd:#4e9012; --gl:#eef7e0; --gp:#f4fbec;
+    --r:#e53935; --rl:#fdecea;
+    --bg:#f0f2ee; --t:#2a3020; --m:#7a8572;
+    --b3:#e4e8e0; --b4:#c8cfc2;
+    --warn:#f39c12; --warn-l:#fef5e7; --warn-d:#B9770E;
+    --info:#1e88e5; --info-l:#e8f2fc;
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; font-family:"Cairo",sans-serif; background:var(--bg); color:var(--t); }
+body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:900px; margin:0 auto; }
+.hdr { display:flex; justify-content:space-between; align-items:center; padding:8px 0 18px; }
+.hdr h1 { color:var(--gd); font-size:1.1rem; font-weight:900; }
+.hdr p { color:var(--m); font-size:.75rem; margin-top:2px; }
+.card { background:white; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,.04); margin-bottom:12px; padding:16px; border:1.5px solid var(--b3); }
+.stitle { font-weight:900; font-size:.92rem; color:var(--t); margin-bottom:12px; }
+.fg { margin-bottom:12px; }
+.fg label { display:block; font-size:.7rem; font-weight:700; color:var(--m); margin-bottom:4px; text-transform:uppercase; }
+.fg input,.fg select { width:100%; padding:11px 13px; border:2px solid var(--b3); border-radius:11px; font-family:"Cairo",sans-serif; font-size:.9rem; background:#fafafa; outline:none; }
+.fg input:focus,.fg select:focus { border-color:var(--g); background:white; }
+.btn { padding:12px 18px; border:none; border-radius:13px; font-family:"Cairo",sans-serif; font-size:.85rem; font-weight:900; cursor:pointer; width:100%; }
+.bng { background:linear-gradient(135deg,#6abf1e,#4e9012); color:white; box-shadow:0 4px 12px rgba(78,144,18,.28); }
+.bno { background:white; border:2px solid var(--b3); color:var(--m); }
+.grid4 { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px; }
+@media(min-width:640px){ .grid4 { grid-template-columns:repeat(4,1fr); } }
+.metric { background:white; border-radius:14px; padding:14px; border:1.5px solid var(--b3); }
+.metric .lbl { font-size:.72rem; color:var(--m); margin-bottom:6px; }
+.metric .val { font-size:1.3rem; font-weight:900; color:var(--t); }
+.metric.green .val { color:var(--gd); }
+.metric.warn .val { color:var(--warn-d); }
+.grid3 { display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:16px; }
+@media(min-width:640px){ .grid3 { grid-template-columns:repeat(3,1fr); } }
+.branch-card { background:white; border:1.5px solid var(--b3); border-radius:14px; padding:14px; }
+.branch-card .bname { font-weight:900; font-size:.85rem; margin-bottom:8px; }
+.branch-card .bval { font-size:1.1rem; font-weight:900; color:var(--gd); }
+.branch-card .bmeta { font-size:.72rem; color:var(--m); margin-top:2px; }
+.list-item { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid var(--b3); font-size:.8rem; }
+.list-item:first-child { border-top:none; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.68rem; font-weight:700; }
+.bwarn { background:var(--warn-l); color:var(--warn-d); }
+.bg { background:var(--gl); color:var(--gd); }
+.msg { padding:11px 13px; border-radius:11px; font-size:.8rem; margin-top:10px; display:none; font-weight:700; }
+.msg.ok { background:var(--gl); color:var(--gd); border:1.5px solid var(--g); display:block; }
+.msg.err { background:var(--rl); color:var(--r); border:1.5px solid var(--r); display:block; }
+.hidden { display:none !important; }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="loginView">
+  <div class="hdr"><div><h1>Degla Lab</h1><p>لوحة صاحب العمل</p></div></div>
+  <div class="card">
+    <div class="stitle">تسجيل الدخول</div>
+    <div class="fg"><label>الإيميل</label><input type="email" id="ownerEmail"/></div>
+    <div class="fg"><label>كلمة السر</label><input type="password" id="ownerPassword"/></div>
+    <button class="btn bng" onclick="doOwnerLogin()">دخول</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- APP VIEW -->
+<div id="appView" class="hidden">
+  <div class="hdr">
+    <div><h1>Degla Lab</h1><p>التقفيل اليومي - كل الفروع</p></div>
+    <input type="date" id="dateFilter" style="padding:8px 10px;border:1.5px solid var(--b3);border-radius:10px;font-family:'Cairo',sans-serif"/>
+  </div>
+
+  <div class="grid4">
+    <div class="metric"><div class="lbl">إجمالي الإيراد</div><div class="val" id="mTotal">0</div></div>
+    <div class="metric green"><div class="lbl">المحصّل فعليًا</div><div class="val" id="mCollected">0</div></div>
+    <div class="metric warn"><div class="lbl">المتبقي على المرضى</div><div class="val" id="mRemaining">0</div></div>
+    <div class="metric"><div class="lbl">عدد الحالات</div><div class="val" id="mCount">0</div></div>
+  </div>
+
+  <div class="stitle">مقارنة الفروع</div>
+  <div class="grid3" id="branchGrid"></div>
+
+  <div class="row2">
+    <div class="card">
+      <div class="stitle">قائمة المتأخرين (كل الفروع)</div>
+      <div id="debtorsList"></div>
+    </div>
+    <div class="card">
+      <div class="stitle">أكثر التحاليل طلبًا</div>
+      <div id="topTests"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="stitle">إضافة موظف جديد</div>
+    <div class="fg"><label>الاسم</label><input type="text" id="newEmpName"/></div>
+    <div class="fg"><label>الفرع</label><select id="newEmpBranch"></select></div>
+    <div class="fg"><label>الكود (6 أرقام على الأقل)</label><input type="text" id="newEmpPin" inputmode="numeric"/></div>
+    <button class="btn bng" onclick="addEmployee()">إضافة الموظف</button>
+    <div class="msg" id="empMsg"></div>
+  </div>
+
+  <button class="btn bno" onclick="sb.auth.signOut().then(()=>location.reload())">تسجيل الخروج</button>
+</div>
+
+<script>
+const SUPABASE_URL = "https://gykinznwbyzrmuohzgdg.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5a2luem53Ynl6cm11b2h6Z2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODIzODgsImV4cCI6MjEwMDU1ODM4OH0.QMtKX5LBdH2HPrFIIZ_SUCgBX5KSNjp3WMC9_e4wnq0";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let branches = [];
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { await afterLogin(); }
+}
+
+async function doOwnerLogin() {
+  const email = document.getElementById('ownerEmail').value;
+  const password = document.getElementById('ownerPassword').value;
+  const msg = document.getElementById('loginMsg');
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { msg.className='msg err'; msg.textContent='بيانات الدخول غلط'; return; }
+  await afterLogin();
+}
+
+async function afterLogin() {
+  const { data: { user } } = await sb.auth.getUser();
+  const { data: profile } = await sb.from('app_users').select('role').eq('id', user.id).single();
+  if (!profile || profile.role !== 'owner') {
+    document.getElementById('loginMsg').className='msg err';
+    document.getElementById('loginMsg').textContent='الحساب ده مش حساب مالك';
+    await sb.auth.signOut();
+    return;
+  }
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+
+  const { data: br } = await sb.from('branches').select('id,name').eq('is_active', true).order('name');
+  branches = br || [];
+  const sel = document.getElementById('newEmpBranch');
+  branches.forEach(b => { const o = document.createElement('option'); o.value=b.id; o.textContent=b.name; sel.appendChild(o); });
+
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('dateFilter').value = today;
+  document.getElementById('dateFilter').onchange = loadDashboard;
+  await loadDashboard();
+}
+
+async function loadDashboard() {
+  const day = document.getElementById('dateFilter').value;
+  const start = day + 'T00:00:00';
+  const end = day + 'T23:59:59';
+
+  const { data: visits } = await sb.from('visits').select('total_price,paid_amount,remaining_amount,branch_id,patients(name)').gte('created_at', start).lte('created_at', end);
+  const { data: collections } = await sb.from('collections').select('amount').gte('created_at', start).lte('created_at', end);
+  const { data: allDebtors } = await sb.from('visits').select('remaining_amount,branch_id,patients(name)').gt('remaining_amount', 0);
+  const { data: tests } = await sb.from('visit_tests').select('test_name, visits!inner(created_at)').gte('visits.created_at', start).lte('visits.created_at', end);
+
+  const totalRevenue = (visits||[]).reduce((s,v)=>s+Number(v.total_price||0),0);
+  const totalCollected = (visits||[]).reduce((s,v)=>s+Number(v.paid_amount||0),0) + (collections||[]).reduce((s,c)=>s+Number(c.amount||0),0);
+  const totalRemaining = (visits||[]).reduce((s,v)=>s+Number(v.remaining_amount||0),0);
+
+  document.getElementById('mTotal').textContent = totalRevenue;
+  document.getElementById('mCollected').textContent = totalCollected;
+  document.getElementById('mRemaining').textContent = totalRemaining;
+  document.getElementById('mCount').textContent = (visits||[]).length;
+
+  const bGrid = document.getElementById('branchGrid');
+  bGrid.innerHTML = '';
+  branches.forEach(b => {
+    const bv = (visits||[]).filter(v=>v.branch_id===b.id);
+    const rev = bv.reduce((s,v)=>s+Number(v.total_price||0),0);
+    const rem = bv.reduce((s,v)=>s+Number(v.remaining_amount||0),0);
+    const card = document.createElement('div'); card.className = 'branch-card';
+    card.innerHTML = `<div class="bname">${b.name}</div><div class="bval">${rev} <span style="font-size:.7rem;color:var(--m);font-weight:400">جنيه</span></div><div class="bmeta">${bv.length} حالة · متبقي ${rem}</div>`;
+    bGrid.appendChild(card);
+  });
+
+  const debtWrap = document.getElementById('debtorsList');
+  debtWrap.innerHTML = '';
+  if (!allDebtors || !allDebtors.length) debtWrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش متأخرين</div>';
+  (allDebtors||[]).slice(0,10).forEach(v => {
+    const bname = branches.find(b=>b.id===v.branch_id)?.name || '';
+    const row = document.createElement('div'); row.className = 'list-item';
+    row.innerHTML = `<div><div>${v.patients?.name||''}</div><div style="font-size:.7rem;color:var(--m)">${bname}</div></div><span class="badge bwarn">${v.remaining_amount} جنيه</span>`;
+    debtWrap.appendChild(row);
+  });
+
+  const counts = {};
+  (tests||[]).forEach(t => { counts[t.test_name] = (counts[t.test_name]||0)+1; });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const topWrap = document.getElementById('topTests');
+  topWrap.innerHTML = '';
+  if (!sorted.length) topWrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش بيانات لليوم ده</div>';
+  sorted.forEach(([name,count]) => {
+    const row = document.createElement('div'); row.className = 'list-item';
+    row.innerHTML = `<span>${name}</span><span style="color:var(--m)">${count}</span>`;
+    topWrap.appendChild(row);
+  });
+}
+
+async function addEmployee() {
+  const msg = document.getElementById('empMsg');
+  msg.className = 'msg';
+  const name = document.getElementById('newEmpName').value.trim();
+  const branch_id = document.getElementById('newEmpBranch').value;
+  const pin = document.getElementById('newEmpPin').value.trim();
+  if (!name || !branch_id || pin.length < 6) { msg.className='msg err'; msg.textContent='كمّل البيانات - الكود لازم 6 أرقام على الأقل'; return; }
+
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/create-employee`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+    body: JSON.stringify({ name, branch_id, pin })
+  });
+  const result = await res.json();
+  if (!res.ok) { msg.className='msg err'; msg.textContent='خطأ: ' + (result.error||''); return; }
+  msg.className='msg ok'; msg.textContent='تم إضافة الموظف: ' + name;
+  document.getElementById('newEmpName').value=''; document.getElementById('newEmpPin').value='';
+}
+
+init();
+</script>
+</body>
+</html>

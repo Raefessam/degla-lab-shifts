@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<title>Degla Lab - شاشة الموظف</title>
+<meta name="theme-color" content="#4e9012"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+    --g:#6abf1e; --gd:#4e9012; --gl:#eef7e0; --gp:#f4fbec;
+    --r:#e53935; --rl:#fdecea;
+    --bg:#f0f2ee; --t:#2a3020; --m:#7a8572;
+    --b3:#e4e8e0; --b4:#c8cfc2;
+    --info:#1e88e5; --info-l:#e8f2fc;
+    --warn:#f39c12; --warn-l:#fef5e7; --warn-d:#B9770E;
+    --purple:#8e44ad; --purple-l:#f3e6fa;
+    --radius-md:14px; --radius-lg:18px;
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; font-family:"Cairo",sans-serif; background:var(--bg); color:var(--t); }
+body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:520px; margin:0 auto; }
+.hdr { text-align:center; padding:16px 0 18px; }
+.hdr h1 { color:var(--gd); font-size:1.1rem; font-weight:900; }
+.hdr p { color:var(--m); font-size:.75rem; margin-top:2px; }
+.card { background:white; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,.04); margin-bottom:12px; padding:16px; border:1.5px solid var(--b3); }
+.stitle { font-weight:900; font-size:.92rem; color:var(--t); margin-bottom:12px; }
+.fg { margin-bottom:12px; }
+.fg label { display:block; font-size:.7rem; font-weight:700; color:var(--m); margin-bottom:4px; text-transform:uppercase; }
+.fg input,.fg select,.fg textarea { width:100%; padding:11px 13px; border:2px solid var(--b3); border-radius:11px; font-family:"Cairo",sans-serif; font-size:.9rem; color:var(--t); background:#fafafa; outline:none; transition:border-color .2s; -webkit-appearance:none; }
+.fg input:focus,.fg select:focus,.fg textarea:focus { border-color:var(--g); background:white; }
+.btn { padding:12px 18px; border:none; border-radius:13px; font-family:"Cairo",sans-serif; font-size:.85rem; font-weight:900; cursor:pointer; width:100%; transition:all .2s; }
+.bng { background:linear-gradient(135deg,#6abf1e,#4e9012); color:white; box-shadow:0 4px 12px rgba(78,144,18,.28); }
+.br { background:linear-gradient(135deg,#e53935,#c62828); color:white; box-shadow:0 4px 12px rgba(197,40,40,.25); }
+.bno { background:white; border:2px solid var(--b3); color:var(--m); }
+.tab-bar { display:flex; gap:6px; margin-bottom:14px; background:var(--b3); border-radius:12px; padding:4px; }
+.tab-btn { flex:1; padding:9px 6px; border:none; border-radius:9px; font-family:"Cairo",sans-serif; font-size:.72rem; font-weight:700; cursor:pointer; background:transparent; color:var(--m); }
+.tab-btn.act { background:var(--gd); color:white; box-shadow:0 2px 8px rgba(45,110,14,.3); }
+.panel { display:none; }
+.panel.active { display:block; }
+.chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.chip { padding:7px 12px; border-radius:20px; border:1.5px solid var(--b3); background:white; font-family:"Cairo",sans-serif; font-size:.76rem; font-weight:700; color:var(--t); cursor:pointer; }
+.chip.dashed { border-style:dashed; color:var(--m); }
+.test-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid var(--b3); }
+.test-row input { width:80px; text-align:center; padding:8px; }
+.totals { background:var(--gl); border-radius:12px; padding:14px; margin-bottom:12px; }
+.totals-line { display:flex; justify-content:space-between; font-size:.85rem; margin-bottom:6px; color:var(--gd); }
+.totals-line.net { font-weight:900; font-size:1rem; border-top:1.5px solid rgba(78,144,18,.25); padding-top:8px; margin-top:8px; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.68rem; font-weight:700; }
+.bg { background:var(--gl); color:var(--gd); }
+.bwarn { background:var(--warn-l); color:var(--warn-d); }
+.list-item { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid var(--b3); font-size:.8rem; }
+.list-item:first-child { border-top:none; }
+.msg { padding:11px 13px; border-radius:11px; font-size:.8rem; margin-top:10px; display:none; font-weight:700; }
+.msg.ok { background:var(--gl); color:var(--gd); border:1.5px solid var(--g); display:block; }
+.msg.err { background:var(--rl); color:var(--r); border:1.5px solid var(--r); display:block; }
+.hidden { display:none !important; }
+.pmodal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:9999; align-items:center; justify-content:center; }
+.pmodal.show { display:flex; }
+.pbox { background:white; border-radius:20px; padding:24px; text-align:center; max-width:90vw; width:340px; box-shadow:0 15px 50px rgba(0,0,0,.3); }
+.ptitle { font-size:1.05rem; font-weight:900; margin-bottom:14px; }
+.shift-status { display:flex; align-items:center; justify-content:space-between; }
+.shift-status .m { color:var(--m); font-size:.75rem; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>Degla Lab</h1>
+  <p>شاشة الموظف</p>
+</div>
+
+<!-- LOGIN VIEW -->
+<div id="loginView">
+  <div class="card">
+    <div class="stitle">تسجيل الدخول</div>
+    <div class="fg">
+      <label>الفرع</label>
+      <select id="branchSelect"><option value="">اختر الفرع...</option></select>
+    </div>
+    <div class="fg">
+      <label>الاسم</label>
+      <select id="nameSelect" disabled><option value="">اختر الفرع أولاً</option></select>
+    </div>
+    <div class="fg">
+      <label>الكود</label>
+      <input type="password" id="pinInput" inputmode="numeric" placeholder="••••••" maxlength="12"/>
+    </div>
+    <button class="btn bng" onclick="doLogin()">دخول</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- APP VIEW -->
+<div id="appView" class="hidden">
+
+  <div class="card shift-status">
+    <div>
+      <div style="font-weight:900;font-size:.95rem" id="empNameDisplay"></div>
+      <div class="m" id="branchNameDisplay"></div>
+    </div>
+    <div id="shiftBadge"><span class="badge bwarn">مفيش شيفت مفتوح</span></div>
+  </div>
+
+  <div id="noShiftCard" class="card">
+    <div class="stitle">ابدأ شغلك</div>
+    <button class="btn bng" onclick="openShift()">فتح شيفت</button>
+  </div>
+
+  <div id="shiftArea" class="hidden">
+
+    <div class="tab-bar">
+      <button class="tab-btn act" data-tab="visit" onclick="switchTab('visit')">حالة جديدة</button>
+      <button class="tab-btn" data-tab="collect" onclick="switchTab('collect')">تحصيل متبقي</button>
+      <button class="tab-btn" data-tab="expense" onclick="switchTab('expense')">مصروف</button>
+    </div>
+
+    <!-- VISIT PANEL -->
+    <div class="panel active" id="panel-visit">
+      <div class="card">
+        <div class="fg">
+          <label>اسم المريض</label>
+          <input type="text" id="patientName" placeholder="اكتب اسم المريض"/>
+        </div>
+        <div class="stitle" style="margin-top:6px">التحاليل</div>
+        <div class="chip-row" id="quickTests"></div>
+        <div id="testRows"></div>
+        <div class="totals">
+          <div class="totals-line"><span>الإجمالي</span><span id="totalPrice">0</span></div>
+          <div class="fg" style="margin-bottom:6px">
+            <label>المدفوع</label>
+            <input type="number" id="paidAmount" value="0" oninput="recalc()"/>
+          </div>
+          <div class="totals-line net"><span>المتبقي</span><span id="remainingAmount">0</span></div>
+        </div>
+        <div class="fg">
+          <label>طريقة الدفع</label>
+          <select id="visitPaymentMethod">
+            <option value="cash">كاش</option>
+            <option value="transfer">تحويل</option>
+            <option value="wallet">محفظة</option>
+            <option value="instapay">إنستاباي</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>ملاحظات (اختياري)</label>
+          <textarea id="visitNotes" rows="2"></textarea>
+        </div>
+        <button class="btn bng" onclick="saveVisit()">حفظ الحالة</button>
+        <div class="msg" id="visitMsg"></div>
+      </div>
+    </div>
+
+    <!-- COLLECT PANEL -->
+    <div class="panel" id="panel-collect">
+      <div class="card">
+        <div class="stitle">قائمة المتأخرين (فرعك)</div>
+        <div id="debtorsList"></div>
+      </div>
+      <div class="card hidden" id="collectFormCard">
+        <div class="stitle" id="collectPatientTitle"></div>
+        <div class="fg">
+          <label>المبلغ المحصّل</label>
+          <input type="number" id="collectAmount"/>
+        </div>
+        <div class="fg">
+          <label>طريقة الدفع</label>
+          <select id="collectPaymentMethod">
+            <option value="cash">كاش</option>
+            <option value="transfer">تحويل</option>
+            <option value="wallet">محفظة</option>
+            <option value="instapay">إنستاباي</option>
+          </select>
+        </div>
+        <button class="btn bng" onclick="saveCollection()">حفظ التحصيل</button>
+        <div class="msg" id="collectMsg"></div>
+      </div>
+    </div>
+
+    <!-- EXPENSE PANEL -->
+    <div class="panel" id="panel-expense">
+      <div class="card">
+        <div class="fg">
+          <label>وصف المصروف</label>
+          <input type="text" id="expenseDesc" placeholder="شحن إنترنت, سلفة, صيانة..."/>
+        </div>
+        <div class="fg">
+          <label>المبلغ</label>
+          <input type="number" id="expenseAmount"/>
+        </div>
+        <button class="btn bng" onclick="saveExpense()">حفظ المصروف</button>
+        <div class="msg" id="expenseMsg"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stitle">ملخص الشيفت</div>
+      <div class="totals-line"><span>عدد الحالات</span><span id="sumVisits">0</span></div>
+      <div class="totals-line"><span>إجمالي محصّل (حالات + تحصيل)</span><span id="sumCollected">0</span></div>
+      <div class="totals-line"><span>المصاريف</span><span id="sumExpenses">0</span></div>
+      <div class="totals-line net"><span>صافي الشيفت</span><span id="sumNet">0</span></div>
+    </div>
+
+    <button class="btn br" onclick="openCloseModal()">قفل الشيفت</button>
+  </div>
+</div>
+
+<!-- CLOSE SHIFT MODAL -->
+<div class="pmodal" id="closeModal">
+  <div class="pbox">
+    <div class="ptitle">تسوية الكاش وقفل الشيفت</div>
+    <div class="fg" style="text-align:right">
+      <label>الكاش المتوقع في الدرج</label>
+      <input type="text" id="expectedCashDisplay" disabled/>
+    </div>
+    <div class="fg" style="text-align:right">
+      <label>الكاش الفعلي اللي عددته</label>
+      <input type="number" id="actualCashInput"/>
+    </div>
+    <div class="fg" style="text-align:right">
+      <label>ملاحظة الفرق (اختياري)</label>
+      <textarea id="cashDiffNote" rows="2"></textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn bno" onclick="closeCloseModal()">إلغاء</button>
+      <button class="btn br" onclick="confirmCloseShift()">تأكيد القفل</button>
+    </div>
+    <div class="msg" id="closeMsg"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://gykinznwbyzrmuohzgdg.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5a2luem53Ynl6cm11b2h6Z2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODIzODgsImV4cCI6MjEwMDU1ODM4OH0.QMtKX5LBdH2HPrFIIZ_SUCgBX5KSNjp3WMC9_e4wnq0";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const QUICK_TESTS = ["CBC","Pregnancy","FBG","PPB","Urine","Urine ck"];
+let currentTests = [];
+let myProfile = null;
+let myShift = null;
+let selectedDebtVisit = null;
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { await afterLogin(); return; }
+  await loadBranches();
+}
+
+async function loadBranches() {
+  const { data, error } = await sb.from('branches').select('id,name').eq('is_active', true).order('name');
+  const sel = document.getElementById('branchSelect');
+  if (data) data.forEach(b => {
+    const o = document.createElement('option'); o.value = b.id; o.textContent = b.name; sel.appendChild(o);
+  });
+  sel.onchange = loadNamesForBranch;
+}
+
+async function loadNamesForBranch() {
+  const branchId = document.getElementById('branchSelect').value;
+  const nameSel = document.getElementById('nameSelect');
+  nameSel.innerHTML = '<option value="">اختر...</option>';
+  nameSel.disabled = !branchId;
+  if (!branchId) return;
+  const { data, error } = await sb.rpc('list_branch_employees', { p_branch_id: branchId });
+  if (data) data.forEach(r => {
+    const o = document.createElement('option'); o.value = r.name; o.textContent = r.name; nameSel.appendChild(o);
+  });
+}
+
+async function doLogin() {
+  const branchId = document.getElementById('branchSelect').value;
+  const name = document.getElementById('nameSelect').value;
+  const pin = document.getElementById('pinInput').value;
+  const msg = document.getElementById('loginMsg');
+  msg.className = 'msg'; msg.textContent = '';
+  if (!branchId || !name || !pin) { msg.className = 'msg err'; msg.textContent = 'كمّل البيانات كلها'; return; }
+
+  const { data: email, error: e1 } = await sb.rpc('get_login_email', { p_name: name, p_branch_id: branchId });
+  if (e1 || !email) { msg.className = 'msg err'; msg.textContent = 'مش لاقي الحساب ده'; return; }
+
+  const { error: e2 } = await sb.auth.signInWithPassword({ email, password: pin });
+  if (e2) { msg.className = 'msg err'; msg.textContent = 'الكود غلط'; return; }
+  await afterLogin();
+}
+
+async function afterLogin() {
+  const { data: { user } } = await sb.auth.getUser();
+  const { data: profile } = await sb.from('app_users').select('*, branches(name)').eq('id', user.id).single();
+  myProfile = profile;
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+  document.getElementById('empNameDisplay').textContent = profile.name;
+  document.getElementById('branchNameDisplay').textContent = profile.branches?.name || '';
+  buildQuickTests();
+  await checkOpenShift();
+}
+
+function buildQuickTests() {
+  const wrap = document.getElementById('quickTests');
+  wrap.innerHTML = '';
+  QUICK_TESTS.forEach(t => {
+    const c = document.createElement('div'); c.className = 'chip'; c.textContent = t;
+    c.onclick = () => addTestRow(t);
+    wrap.appendChild(c);
+  });
+  const other = document.createElement('div'); other.className = 'chip dashed'; other.textContent = '+ تحليل آخر';
+  other.onclick = () => { const n = prompt('اسم التحليل؟'); if (n) addTestRow(n); };
+  wrap.appendChild(other);
+}
+
+function addTestRow(name) {
+  currentTests.push({ name, price: 0 });
+  renderTestRows();
+}
+function removeTestRow(i) { currentTests.splice(i,1); renderTestRows(); }
+function renderTestRows() {
+  const wrap = document.getElementById('testRows');
+  wrap.innerHTML = '';
+  currentTests.forEach((t, i) => {
+    const row = document.createElement('div'); row.className = 'test-row';
+    row.innerHTML = `<span>${t.name}</span><span style="display:flex;align-items:center;gap:8px">
+      <input type="number" value="${t.price}" onchange="currentTests[${i}].price=Number(this.value)||0;recalc()"/>
+      <span style="font-size:.72rem;color:var(--m)">جنيه</span>
+      <span style="cursor:pointer;color:var(--r)" onclick="removeTestRow(${i})">×</span></span>`;
+    wrap.appendChild(row);
+  });
+  recalc();
+}
+function recalc() {
+  const total = currentTests.reduce((s,t) => s + (Number(t.price)||0), 0);
+  const paid = Number(document.getElementById('paidAmount').value) || 0;
+  document.getElementById('totalPrice').textContent = total;
+  document.getElementById('remainingAmount').textContent = Math.max(total - paid, 0);
+}
+
+async function checkOpenShift() {
+  const { data } = await sb.from('shifts').select('*').eq('employee_id', myProfile.id).eq('status','open').order('opened_at',{ascending:false}).limit(1);
+  if (data && data.length) {
+    myShift = data[0];
+    document.getElementById('shiftBadge').innerHTML = '<span class="badge bg">شيفت مفتوح</span>';
+    document.getElementById('noShiftCard').classList.add('hidden');
+    document.getElementById('shiftArea').classList.remove('hidden');
+    await refreshShiftSummary();
+    await loadDebtors();
+  } else {
+    myShift = null;
+    document.getElementById('shiftBadge').innerHTML = '<span class="badge bwarn">مفيش شيفت مفتوح</span>';
+    document.getElementById('noShiftCard').classList.remove('hidden');
+    document.getElementById('shiftArea').classList.add('hidden');
+  }
+}
+
+async function openShift() {
+  const { data, error } = await sb.from('shifts').insert({ employee_id: myProfile.id, branch_id: myProfile.branch_id }).select().single();
+  if (!error) { myShift = data; await checkOpenShift(); }
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('act', b.dataset.tab === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+async function saveVisit() {
+  const msg = document.getElementById('visitMsg');
+  msg.className = 'msg';
+  const name = document.getElementById('patientName').value.trim();
+  if (!name || currentTests.length === 0) { msg.className='msg err'; msg.textContent='اكتب اسم المريض وضيف تحليل واحد على الأقل'; return; }
+
+  let { data: patient } = await sb.from('patients').select('id').eq('name', name).limit(1).maybeSingle();
+  if (!patient) {
+    const { data: newP, error: pErr } = await sb.from('patients').insert({ name }).select().single();
+    if (pErr) { msg.className='msg err'; msg.textContent='خطأ في حفظ اسم المريض'; return; }
+    patient = newP;
+  }
+
+  const total = currentTests.reduce((s,t)=>s+(Number(t.price)||0),0);
+  const paid = Number(document.getElementById('paidAmount').value) || 0;
+  const remaining = Math.max(total - paid, 0);
+  const method = document.getElementById('visitPaymentMethod').value;
+  const notes = document.getElementById('visitNotes').value;
+
+  const { data: visit, error: vErr } = await sb.from('visits').insert({
+    patient_id: patient.id, shift_id: myShift.id, branch_id: myProfile.branch_id,
+    total_price: total, paid_amount: paid, remaining_amount: remaining,
+    payment_method: method, notes
+  }).select().single();
+  if (vErr) { msg.className='msg err'; msg.textContent='خطأ: ' + vErr.message; return; }
+
+  const rows = currentTests.map(t => ({ visit_id: visit.id, test_name: t.name, price: t.price }));
+  await sb.from('visit_tests').insert(rows);
+
+  msg.className = 'msg ok'; msg.textContent = 'اتحفظت الحالة';
+  currentTests = []; renderTestRows();
+  document.getElementById('patientName').value = '';
+  document.getElementById('paidAmount').value = 0;
+  document.getElementById('visitNotes').value = '';
+  await refreshShiftSummary();
+  await loadDebtors();
+}
+
+async function loadDebtors() {
+  const { data } = await sb.from('visits').select('id, total_price, paid_amount, remaining_amount, patients(name)')
+    .eq('branch_id', myProfile.branch_id).gt('remaining_amount', 0).order('created_at',{ascending:false});
+  const wrap = document.getElementById('debtorsList');
+  wrap.innerHTML = '';
+  if (!data || !data.length) { wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش متأخرين حاليًا</div>'; return; }
+  data.forEach(v => {
+    const row = document.createElement('div'); row.className = 'list-item';
+    row.style.cursor = 'pointer';
+    row.innerHTML = `<span>${v.patients?.name || ''}</span><span class="badge bwarn">${v.remaining_amount} جنيه</span>`;
+    row.onclick = () => selectDebt(v);
+    wrap.appendChild(row);
+  });
+}
+function selectDebt(v) {
+  selectedDebtVisit = v;
+  document.getElementById('collectFormCard').classList.remove('hidden');
+  document.getElementById('collectPatientTitle').textContent = v.patients?.name + ' - متبقي ' + v.remaining_amount + ' جنيه';
+  document.getElementById('collectAmount').value = v.remaining_amount;
+}
+async function saveCollection() {
+  const msg = document.getElementById('collectMsg');
+  msg.className = 'msg';
+  if (!selectedDebtVisit) return;
+  const amount = Number(document.getElementById('collectAmount').value) || 0;
+  const method = document.getElementById('collectPaymentMethod').value;
+  if (amount <= 0) { msg.className='msg err'; msg.textContent='حط مبلغ صحيح'; return; }
+
+  const { error: cErr } = await sb.from('collections').insert({
+    visit_id: selectedDebtVisit.id, shift_id: myShift.id, amount, payment_method: method
+  });
+  if (cErr) { msg.className='msg err'; msg.textContent='خطأ: '+cErr.message; return; }
+
+  const newRemaining = Math.max(selectedDebtVisit.remaining_amount - amount, 0);
+  const newPaid = selectedDebtVisit.paid_amount + amount;
+  await sb.from('visits').update({ remaining_amount: newRemaining, paid_amount: newPaid }).eq('id', selectedDebtVisit.id);
+
+  msg.className = 'msg ok'; msg.textContent = 'اتحفظ التحصيل';
+  document.getElementById('collectFormCard').classList.add('hidden');
+  selectedDebtVisit = null;
+  await loadDebtors();
+  await refreshShiftSummary();
+}
+
+async function saveExpense() {
+  const msg = document.getElementById('expenseMsg');
+  msg.className = 'msg';
+  const desc = document.getElementById('expenseDesc').value.trim();
+  const amount = Number(document.getElementById('expenseAmount').value) || 0;
+  if (!desc || amount <= 0) { msg.className='msg err'; msg.textContent='كمّل الوصف والمبلغ'; return; }
+  const { error } = await sb.from('expenses').insert({ shift_id: myShift.id, branch_id: myProfile.branch_id, description: desc, amount });
+  if (error) { msg.className='msg err'; msg.textContent='خطأ: '+error.message; return; }
+  msg.className='msg ok'; msg.textContent='اتحفظ المصروف';
+  document.getElementById('expenseDesc').value=''; document.getElementById('expenseAmount').value='';
+  await refreshShiftSummary();
+}
+
+async function refreshShiftSummary() {
+  const { data: visits } = await sb.from('visits').select('paid_amount, payment_method').eq('shift_id', myShift.id);
+  const { data: collections } = await sb.from('collections').select('amount, payment_method').eq('shift_id', myShift.id);
+  const { data: expenses } = await sb.from('expenses').select('amount').eq('shift_id', myShift.id);
+
+  const visitCash = (visits||[]).filter(v=>v.payment_method==='cash').reduce((s,v)=>s+Number(v.paid_amount||0),0);
+  const collectCash = (collections||[]).filter(c=>c.payment_method==='cash').reduce((s,c)=>s+Number(c.amount||0),0);
+  const expenseCash = (expenses||[]).reduce((s,e)=>s+Number(e.amount||0),0);
+
+  const totalCollected = (visits||[]).reduce((s,v)=>s+Number(v.paid_amount||0),0) + (collections||[]).reduce((s,c)=>s+Number(c.amount||0),0);
+  const totalExpenses = expenseCash;
+
+  document.getElementById('sumVisits').textContent = (visits||[]).length;
+  document.getElementById('sumCollected').textContent = totalCollected;
+  document.getElementById('sumExpenses').textContent = totalExpenses;
+  document.getElementById('sumNet').textContent = totalCollected - totalExpenses;
+
+  window._expectedCash = visitCash + collectCash - expenseCash;
+}
+
+function openCloseModal() {
+  document.getElementById('expectedCashDisplay').value = window._expectedCash || 0;
+  document.getElementById('actualCashInput').value = '';
+  document.getElementById('cashDiffNote').value = '';
+  document.getElementById('closeModal').classList.add('show');
+}
+function closeCloseModal() { document.getElementById('closeModal').classList.remove('show'); }
+
+async function confirmCloseShift() {
+  const msg = document.getElementById('closeMsg');
+  msg.className = 'msg';
+  const actual = document.getElementById('actualCashInput').value;
+  const note = document.getElementById('cashDiffNote').value;
+  const { error } = await sb.from('shifts').update({
+    status: 'closed', closed_at: new Date().toISOString(),
+    expected_cash: window._expectedCash || 0,
+    actual_cash: actual === '' ? null : Number(actual),
+    cash_diff_note: note || null
+  }).eq('id', myShift.id);
+  if (error) { msg.className='msg err'; msg.textContent='خطأ: '+error.message; return; }
+  closeCloseModal();
+  await checkOpenShift();
+}
+
+init();
+</script>
+</body>
+</html>
