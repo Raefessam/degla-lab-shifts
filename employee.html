@@ -6,8 +6,15 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="Degla Lab موظف"/>
+<meta name="application-name" content="Degla Lab موظف"/>
 <title>Degla Lab - شاشة الموظف</title>
 <meta name="theme-color" content="#4e9012"/>
+<link rel="manifest" href="manifest-employee.json"/>
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+<link rel="apple-touch-icon" href="icon-180.png"/>
+<link rel="apple-touch-icon" sizes="152x152" href="icon-152.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -495,7 +502,12 @@ async function saveVisit() {
   if (vErr) { msg.className='msg err'; msg.textContent='خطأ: ' + vErr.message; return; }
 
   const rows = currentTests.map(t => ({ visit_id: visit.id, test_name: t.name, price: t.price }));
-  await sb.from('visit_tests').insert(rows);
+  const { error: tErr } = await sb.from('visit_tests').insert(rows);
+  if (tErr) {
+    await sb.from('visits').delete().eq('id', visit.id);
+    msg.className = 'msg err'; msg.textContent = 'فشل حفظ تفاصيل التحاليل، اتلغت الحالة: ' + tErr.message;
+    return;
+  }
 
   msg.className = 'msg ok'; msg.textContent = 'اتحفظت الحالة';
   currentTests = []; renderTestRows();
