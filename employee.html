@@ -655,7 +655,7 @@ async function loadDeliveryList() {
   wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">جاري التحميل...</div>';
 
   const { data, error } = await sb.from('visit_tests')
-    .select('id,test_name,expected_delivery_date,visits!inner(branch_id,patients(name))')
+    .select('id,test_name,expected_delivery_date,visits!inner(branch_id,remaining_amount,patients(name))')
     .eq('visits.branch_id', myProfile.branch_id)
     .is('delivered_at', null)
     .order('expected_delivery_date', { ascending: true, nullsFirst: false });
@@ -666,12 +666,16 @@ async function loadDeliveryList() {
 
   const today = new Date().toISOString().slice(0,10);
   data.forEach(row => {
-    let badge = '<span class="badge" style="background:var(--b3);color:var(--m)">بدون معاد</span>';
+    let dateBadge = '<span class="badge" style="background:var(--b3);color:var(--m)">بدون معاد</span>';
     if (row.expected_delivery_date) {
-      if (row.expected_delivery_date < today) badge = '<span class="badge" style="background:var(--rl);color:var(--r)">متأخر</span>';
-      else if (row.expected_delivery_date === today) badge = '<span class="badge bwarn">جاهز النهاردة</span>';
-      else badge = `<span class="badge bg">${row.expected_delivery_date}</span>`;
+      if (row.expected_delivery_date < today) dateBadge = `<span class="badge" style="background:var(--rl);color:var(--r)">متأخر - ${row.expected_delivery_date}</span>`;
+      else if (row.expected_delivery_date === today) dateBadge = `<span class="badge bwarn">جاهز النهاردة - ${row.expected_delivery_date}</span>`;
+      else dateBadge = `<span class="badge bg">${row.expected_delivery_date}</span>`;
     }
+
+    const remaining = Number(row.visits?.remaining_amount || 0);
+    const hasDebt = remaining > 0;
+
     const card = document.createElement('div');
     card.className = 'card';
     card.style.marginBottom = '10px';
@@ -680,9 +684,16 @@ async function loadDeliveryList() {
           <div style="font-weight:700;font-size:.85rem">${row.visits?.patients?.name||''}</div>
           <span style="background:var(--b3);color:var(--m);padding:2px 8px;border-radius:6px;font-size:.68rem;margin-top:4px;display:inline-block">${row.test_name}</span>
         </div>
-        ${badge}
+        ${dateBadge}
       </div>
-      <button class="btn bng" style="margin-top:10px" onclick="markDelivered('${row.id}')">✓ تم التسليم</button>`;
+      ${hasDebt ? `<div style="margin-top:10px;background:var(--rl);border:1.5px solid var(--r);border-radius:10px;padding:10px 12px">
+          <div style="font-size:.78rem;color:var(--r);font-weight:700;margin-bottom:6px">⚠ متبقي على المريض ${remaining} جنيه</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--t);cursor:pointer">
+            <input type="checkbox" id="confirmPaid_${row.id}" onchange="document.getElementById('deliverBtn_${row.id}').disabled = !this.checked"/>
+            تأكدت إن المبلغ اتحصّل بالكامل (من تاب "تحصيل متبقي") قبل التسليم
+          </label>
+        </div>` : ''}
+      <button class="btn bng" id="deliverBtn_${row.id}" style="margin-top:10px" ${hasDebt ? 'disabled' : ''} onclick="markDelivered('${row.id}')">✓ تم التسليم</button>`;
     wrap.appendChild(card);
   });
 }
