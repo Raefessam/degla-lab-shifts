@@ -112,11 +112,11 @@ body { padding:max(env(safe-area-inset-top,0px),20px) 14px 40px; max-width:900px
   <div class="row2">
     <div class="card">
       <div class="stitle">قائمة المتأخرين (كل الفروع)</div>
-      <div id="debtorsList"></div>
+      <div id="debtorsList" style="max-height:220px;overflow-y:auto"></div>
     </div>
     <div class="card">
       <div class="stitle">أكثر التحاليل طلبًا</div>
-      <div id="topTests"></div>
+      <div id="topTests" style="max-height:280px;overflow-y:auto"></div>
     </div>
   </div>
 
@@ -235,7 +235,7 @@ async function loadDashboard() {
   const debtWrap = document.getElementById('debtorsList');
   debtWrap.innerHTML = '';
   if (!allDebtors || !allDebtors.length) debtWrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش متأخرين</div>';
-  (allDebtors||[]).slice(0,10).forEach(v => {
+  (allDebtors||[]).forEach(v => {
     const bname = branches.find(b=>b.id===v.branch_id)?.name || '';
     const row = document.createElement('div'); row.className = 'list-item';
     row.innerHTML = `<div><div>${v.patients?.name||''}</div><div style="font-size:.7rem;color:var(--m)">${bname}</div></div><span class="badge bwarn">${v.remaining_amount} جنيه</span>`;
@@ -244,7 +244,7 @@ async function loadDashboard() {
 
   const counts = {};
   (tests||[]).forEach(t => { counts[t.test_name] = (counts[t.test_name]||0)+1; });
-  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
   const topWrap = document.getElementById('topTests');
   topWrap.innerHTML = '';
   if (!sorted.length) topWrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش بيانات لليوم ده</div>';
