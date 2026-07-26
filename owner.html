@@ -197,8 +197,8 @@ async function loadDashboard() {
   const start = day + 'T00:00:00';
   const end = day + 'T23:59:59';
 
-  const { data: visits } = await sb.from('visits').select('total_price,paid_amount,remaining_amount,branch_id,patients(name)').gte('created_at', start).lte('created_at', end);
-  const { data: collections } = await sb.from('collections').select('amount').gte('created_at', start).lte('created_at', end);
+  const { data: visits } = await sb.from('visits').select('total_price,paid_amount,remaining_amount,branch_id,payment_method,patients(name)').gte('created_at', start).lte('created_at', end);
+  const { data: collections } = await sb.from('collections').select('amount,payment_method').gte('created_at', start).lte('created_at', end);
   const { data: allDebtors } = await sb.from('visits').select('remaining_amount,branch_id,patients(name)').gt('remaining_amount', 0);
   const { data: tests } = await sb.from('visit_tests').select('test_name, visits!inner(created_at)').gte('visits.created_at', start).lte('visits.created_at', end);
 
@@ -213,8 +213,7 @@ async function loadDashboard() {
 
   const byMethod = { cash: 0, transfer: 0, wallet: 0, instapay: 0 };
   (visits||[]).forEach(v => { byMethod[v.payment_method] = (byMethod[v.payment_method]||0) + Number(v.paid_amount||0); });
-  const { data: collectionsWithMethod } = await sb.from('collections').select('amount,payment_method').gte('created_at', start).lte('created_at', end);
-  (collectionsWithMethod||[]).forEach(c => { byMethod[c.payment_method] = (byMethod[c.payment_method]||0) + Number(c.amount||0); });
+  (collections||[]).forEach(c => { byMethod[c.payment_method] = (byMethod[c.payment_method]||0) + Number(c.amount||0); });
   document.getElementById('mCash').textContent = byMethod.cash;
   document.getElementById('mTransfer').textContent = byMethod.transfer;
   document.getElementById('mWallet').textContent = byMethod.wallet;
@@ -444,19 +443,38 @@ function printShiftReport() {
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"/>
     <title>${window._lastShiftReportTitle||'تقرير الشيفت'}</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
     <style>
-      body{font-family:'Cairo',sans-serif;padding:24px;color:#2a3020}
-      table{width:100%;border-collapse:collapse;font-size:.85rem}
-      th,td{padding:8px;border:1px solid #ccc;vertical-align:middle}
-      .stitle{font-weight:900;font-size:1rem;margin:16px 0 10px}
-      .totals-line{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:6px}
-      .totals-line.net{font-weight:900;font-size:1.05rem;border-top:1.5px solid #ccc;padding-top:8px;margin-top:8px}
-      .totals{border-radius:10px;padding:14px}
-      .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem}
-      .list-item{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #eee}
+      :root {
+        --g:#6abf1e; --gd:#4e9012; --gl:#eef7e0; --gp:#f4fbec;
+        --r:#e53935; --rl:#fdecea;
+        --bg:#f0f2ee; --t:#2a3020; --m:#7a8572;
+        --b3:#e4e8e0; --b4:#c8cfc2;
+        --warn:#f39c12; --warn-l:#fef5e7; --warn-d:#B9770E;
+        --info:#1e88e5; --info-l:#e8f2fc;
+        --purple:#8e44ad; --purple-l:#f3e6fa;
+      }
+      * { box-sizing:border-box; }
+      body{font-family:'Cairo',sans-serif;padding:32px;color:var(--t);max-width:900px;margin:0 auto;line-height:1.6}
+      .stitle{font-weight:900;font-size:1.05rem;margin:20px 0 12px;color:var(--t)}
+      table{width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:8px}
+      th,td{padding:10px 8px;border:1px solid var(--b3);vertical-align:middle;text-align:right}
+      th{background:var(--gp);font-weight:700}
+      .totals{border-radius:12px;padding:16px}
+      .totals-line{display:flex;justify-content:space-between;align-items:center;font-size:.92rem;margin-bottom:8px;gap:12px}
+      .totals-line.net{font-weight:900;font-size:1.1rem;border-top:1.5px solid var(--b3);padding-top:10px;margin-top:10px}
+      .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.78rem;white-space:nowrap}
+      .list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--b3);font-size:.85rem;gap:12px}
+      i.ti{font-size:15px;vertical-align:-2px;margin-inline-start:4px}
       @media print { body{padding:0} }
-    </style></head><body>${window._lastShiftReportHtml||''}
-    <script>window.onload=()=>window.print()<\/script>
+    </style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--g);padding-bottom:14px;margin-bottom:20px">
+      <div style="font-weight:900;font-size:1.3rem;color:var(--gd)">Degla Lab</div>
+      <div style="font-size:.78rem;color:var(--m)">تاريخ الطباعة: ${new Date().toLocaleString('ar-EG')}</div>
+    </div>
+    ${window._lastShiftReportHtml||''}
+    <div style="margin-top:24px;padding-top:14px;border-top:1px solid var(--b3);text-align:center;font-size:.72rem;color:var(--m)">تم الإعداد بواسطة شركة Infinite Systems</div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>
     </body></html>`);
   w.document.close();
 }
