@@ -640,27 +640,34 @@ async function loadShiftLog() {
   wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">جاري التحميل...</div>';
 
   const [{ data: visits }, { data: collections }, { data: expenses }] = await Promise.all([
-    sb.from('visits').select('created_at,total_price,paid_amount,payment_method,patients(name)').eq('shift_id', myShift.id),
+    sb.from('visits').select('created_at,total_price,paid_amount,remaining_amount,payment_method,patients(name),visit_tests(test_name,price)').eq('shift_id', myShift.id),
     sb.from('collections').select('created_at,amount,payment_method,visits(patients(name))').eq('shift_id', myShift.id),
     sb.from('expenses').select('created_at,description,amount').eq('shift_id', myShift.id)
   ]);
 
   const methodLabel = { cash:'كاش', transfer:'تحويل', wallet:'محفظة', instapay:'إنستاباي' };
   const items = [];
-  (visits||[]).forEach(v => items.push({
-    time: v.created_at, type: 'حالة جديدة',
-    text: `${v.patients?.name||''} - إجمالي ${v.total_price} - مدفوع ${v.paid_amount} (${methodLabel[v.payment_method]||''})`,
-    color: 'bg'
-  }));
+  (visits||[]).forEach(v => {
+    const testsHtml = (v.visit_tests||[]).map(t =>
+      `<span style="background:var(--b3);color:var(--m);padding:2px 8px;border-radius:6px;font-size:.68rem;margin-left:4px;display:inline-block;margin-top:4px">${t.test_name} · ${t.price}</span>`
+    ).join('');
+    const remaining = Number(v.remaining_amount||0);
+    items.push({
+      time: v.created_at, type: 'حالة جديدة', color: 'bg',
+      name: v.patients?.name||'',
+      testsHtml,
+      meta: `إجمالي ${v.total_price} · مدفوع ${v.paid_amount} (${methodLabel[v.payment_method]||''})` + (remaining > 0 ? ` · <span style="color:var(--warn-d);font-weight:700">متبقي ${remaining}</span>` : '')
+    });
+  });
   (collections||[]).forEach(c => items.push({
-    time: c.created_at, type: 'تحصيل متبقي',
-    text: `${c.visits?.patients?.name||''} - ${c.amount} جنيه (${methodLabel[c.payment_method]||''})`,
-    color: 'bwarn'
+    time: c.created_at, type: 'تحصيل متبقي', color: 'bwarn',
+    name: c.visits?.patients?.name||'', testsHtml: '',
+    meta: `${c.amount} جنيه (${methodLabel[c.payment_method]||''})`
   }));
   (expenses||[]).forEach(e => items.push({
-    time: e.created_at, type: 'مصروف',
-    text: `${e.description} - ${e.amount} جنيه`,
-    color: 'bwarn'
+    time: e.created_at, type: 'مصروف', color: 'bwarn',
+    name: e.description, testsHtml: '',
+    meta: `${e.amount} جنيه`
   }));
 
   items.sort((a,b) => new Date(b.time) - new Date(a.time));
@@ -668,9 +675,16 @@ async function loadShiftLog() {
   wrap.innerHTML = '';
   if (!items.length) { wrap.innerHTML = '<div style="color:var(--m);font-size:.8rem">مفيش حركات لسه في الشيفت ده</div>'; return; }
   items.forEach(it => {
-    const row = document.createElement('div'); row.className = 'list-item';
     const t = new Date(it.time).toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
-    row.innerHTML = `<div><span class="badge ${it.color}">${it.type}</span><div style="margin-top:4px">${it.text}</div></div><span style="color:var(--m);font-size:.72rem">${t}</span>`;
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:10px 0;border-top:1px solid var(--b3)';
+    row.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span class="badge ${it.color}">${it.type}</span>
+        <span style="color:var(--m);font-size:.72rem">${t}</span>
+      </div>
+      <div style="margin-top:6px;font-size:.85rem">${it.name}</div>
+      ${it.testsHtml ? `<div style="margin-top:2px">${it.testsHtml}</div>` : ''}
+      <div style="margin-top:6px;font-size:.76rem;color:var(--m)">${it.meta}</div>`;
     wrap.appendChild(row);
   });
 }
